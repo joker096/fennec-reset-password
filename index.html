@@ -58,23 +58,19 @@
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .error { color: #ef4444; margin-top: 12px; font-size: 14px; }
     .success { color: #22c55e; margin-top: 12px; font-size: 14px; }
-    .info { color: #3b82f6; margin-top: 12px; font-size: 12px; }
     .hidden { display: none; }
     .debug {
       margin-top: 16px;
-      padding: 12px;
+      padding: 10px;
       background: #0f172a;
-      border-radius: 8px;
+      border-radius: 6px;
       text-align: left;
       font-family: monospace;
-      font-size: 11px;
-      color: #94a3b8;
-      max-height: 200px;
+      font-size: 10px;
+      color: #64748b;
+      max-height: 150px;
       overflow-y: auto;
     }
-    .debug-line { margin-bottom: 4px; }
-    .debug-line.error { color: #ef4444; }
-    .debug-line.success { color: #22c55e; }
   </style>
 </head>
 <body>
@@ -84,33 +80,18 @@
     <p id="subtitle">Enter your new password below</p>
 
     <form id="resetForm">
-      <input 
-        type="password" 
-        id="newPassword" 
-        placeholder="New password" 
-        required 
-        minlength="6"
-      />
-      <input 
-        type="password" 
-        id="confirmPassword" 
-        placeholder="Confirm new password" 
-        required 
-      />
+      <input type="password" id="newPassword" placeholder="New password" required minlength="6"/>
+      <input type="password" id="confirmPassword" placeholder="Confirm new password" required/>
       <button type="submit" id="submitBtn">Update Password</button>
     </form>
 
     <div id="message" class="hidden"></div>
-    <div id="openAppBtn" class="hidden" style="margin-top: 16px;">
-      <button onclick="openApp()" style="background: #22c55e;">Open Fennec App</button>
-    </div>
-
     <div id="debugLog" class="debug hidden"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    // MATCHES src/lib/supabase.ts
+    // MUST match src/lib/supabase.ts
     const SUPABASE_URL = 'https://qhiietjvfuekfaehddox.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoaWlldGp2ZnVla2ZhZWhkZG94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNDY3MTAsImV4cCI6MjA2NTcyMjcxMH0.Ae-xBpuSnLcQpWGC8COR3N_5BAjdJ6cqkzP4rnCJAzA';
 
@@ -123,13 +104,11 @@
     const message = document.getElementById('message');
     const subtitle = document.getElementById('subtitle');
     const debugLog = document.getElementById('debugLog');
-    const openAppBtn = document.getElementById('openAppBtn');
 
-    function log(text, type) {
+    function log(text) {
       console.log('[Reset]', text);
       const line = document.createElement('div');
-      line.className = 'debug-line' + (type ? ' ' + type : '');
-      line.textContent = new Date().toLocaleTimeString() + ' ' + text;
+      line.textContent = text;
       debugLog.appendChild(line);
       debugLog.classList.remove('hidden');
     }
@@ -138,45 +117,24 @@
       message.textContent = text;
       message.className = 'error';
       message.classList.remove('hidden');
-      log('ERROR: ' + text, 'error');
     }
 
     function showSuccess(text) {
       message.textContent = text;
       message.className = 'success';
       message.classList.remove('hidden');
-      log('SUCCESS: ' + text, 'success');
     }
 
-    function showInfo(text) {
-      message.textContent = text;
-      message.className = 'info';
-      message.classList.remove('hidden');
-      log('INFO: ' + text);
-    }
+    // Parse token from URL: ?token=xxx&type=recovery
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const type = params.get('type');
 
-    function openApp() {
-      // Try to open Android app via intent
-      window.location.href = 'intent://#Intent;scheme=capacitor;package=com.fennec.academy;end';
-      setTimeout(() => {
-        // Fallback if app not installed
-        subtitle.textContent = 'You can close this page and open the Fennec app manually.';
-      }, 500);
-    }
+    log('Token present: ' + !!token);
+    log('Type: ' + type);
 
-    // Parse hash params
-    const pageHash = window.location.hash.substring(1);
-    const pageParams = new URLSearchParams(pageHash);
-    const accessToken = pageParams.get('access_token');
-    const refreshToken = pageParams.get('refresh_token');
-    const type = pageParams.get('type');
-
-    log('Page loaded. Hash type: ' + type);
-    log('Access token present: ' + !!accessToken);
-    log('Refresh token present: ' + !!refreshToken);
-
-    if (type !== 'recovery' || !accessToken) {
-      showError('Invalid or expired reset link. Please request a new one from the app.');
+    if (!token || type !== 'recovery') {
+      showError('Invalid or expired reset link. Please request a new one from the Fennec app.');
       form.style.display = 'none';
       subtitle.textContent = 'Link error';
     }
@@ -188,7 +146,6 @@
         showError('Passwords do not match');
         return;
       }
-
       if (newPassword.value.length < 6) {
         showError('Password must be at least 6 characters');
         return;
@@ -198,52 +155,47 @@
       submitBtn.textContent = 'Updating...';
 
       try {
-        log('Step 1: Setting session with recovery token...');
+        log('Step 1: Verifying recovery token...');
         
-        // Set the session from the recovery token
-        const sessionData = {
-          access_token: accessToken,
-          refresh_token: refreshToken || ''
-        };
-        log('Session data: ' + JSON.stringify({ access_token: '***', refresh_token: refreshToken ? '***' : 'none' }));
+        // Verify OTP token — this establishes a session
+        const { data: verifyData, error: verifyError } = await client.auth.verifyOtp({
+          token: token,
+          type: 'recovery'
+        });
 
-        const { data: sessionResult, error: sessionError } = await client.auth.setSession(sessionData);
-
-        if (sessionError) {
-          log('setSession error: ' + sessionError.message, 'error');
-          throw sessionError;
+        if (verifyError) {
+          log('verifyOtp error: ' + verifyError.message);
+          throw verifyError;
         }
         
-        log('Step 2: Session set. User: ' + (sessionResult?.user?.email || 'unknown'));
+        log('Step 2: Token verified. User: ' + (verifyData?.user?.email || 'OK'));
 
-        // Verify we have a valid session
+        // Double-check session is active
         const { data: { session } } = await client.auth.getSession();
         if (!session) {
-          throw new Error('Session not established after setSession');
+          throw new Error('Session not established after verification');
         }
-        log('Step 3: Session verified. User ID: ' + session.user.id.substring(0, 8) + '...');
+        log('Step 3: Session active for user ' + session.user.id.substring(0,8));
 
-        // Update the password
+        // Update password
         log('Step 4: Updating password...');
-        const { data: updateResult, error: updateError } = await client.auth.updateUser({
+        const { data: updateData, error: updateError } = await client.auth.updateUser({
           password: newPassword.value
         });
 
         if (updateError) {
-          log('updateUser error: ' + updateError.message, 'error');
+          log('updateUser error: ' + updateError.message);
           throw updateError;
         }
 
-        log('Step 5: Password updated for user: ' + updateResult?.user?.email);
-        
-        showSuccess('Password updated! You can now sign in with your new password.');
+        log('Step 5: Password updated!');
+        showSuccess('Password updated! You can now sign in to the Fennec app with your new password.');
         form.style.display = 'none';
-        openAppBtn.classList.remove('hidden');
         subtitle.textContent = 'Success!';
 
       } catch (err) {
-        log('CATCH: ' + (err.message || err), 'error');
-        showError(err.message || 'Something went wrong. Please try again or request a new link.');
+        log('ERROR: ' + (err.message || JSON.stringify(err)));
+        showError(err.message || 'Something went wrong. Please request a new reset link.');
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Update Password';
