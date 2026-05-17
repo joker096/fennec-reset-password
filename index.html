@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fennec Academy — Reset Password</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .logo {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    h1 { font-size: 24px; margin-bottom: 8px; color: #f8fafc; }
+    p { color: #94a3b8; margin-bottom: 24px; }
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 16px;
+    }
+    input:focus { outline: none; border-color: #3b82f6; }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error { color: #ef4444; margin-top: 12px; font-size: 14px; }
+    .success { color: #22c55e; margin-top: 12px; font-size: 14px; }
+    .info { color: #3b82f6; margin-top: 12px; font-size: 12px; }
+    .hidden { display: none; }
+    .debug {
+      margin-top: 16px;
+      padding: 12px;
+      background: #0f172a;
+      border-radius: 8px;
+      text-align: left;
+      font-family: monospace;
+      font-size: 11px;
+      color: #94a3b8;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .debug-line { margin-bottom: 4px; }
+    .debug-line.error { color: #ef4444; }
+    .debug-line.success { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🦊</div>
+    <h1>Reset Password</h1>
+    <p id="subtitle">Enter your new password below</p>
+
+    <form id="resetForm">
+      <input 
+        type="password" 
+        id="newPassword" 
+        placeholder="New password" 
+        required 
+        minlength="6"
+      />
+      <input 
+        type="password" 
+        id="confirmPassword" 
+        placeholder="Confirm new password" 
+        required 
+      />
+      <button type="submit" id="submitBtn">Update Password</button>
+    </form>
+
+    <div id="message" class="hidden"></div>
+    <div id="openAppBtn" class="hidden" style="margin-top: 16px;">
+      <button onclick="openApp()" style="background: #22c55e;">Open Fennec App</button>
+    </div>
+
+    <div id="debugLog" class="debug hidden"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    // MATCHES src/lib/supabase.ts
+    const SUPABASE_URL = 'https://qhiietjvfuekfaehddox.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoaWlldGp2ZnVla2ZhZWhkZG94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNDY3MTAsImV4cCI6MjA2NTcyMjcxMH0.Ae-xBpuSnLcQpWGC8COR3N_5BAjdJ6cqkzP4rnCJAzA';
+
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const form = document.getElementById('resetForm');
+    const newPassword = document.getElementById('newPassword');
+    const confirmPassword = document.getElementById('confirmPassword');
+    const submitBtn = document.getElementById('submitBtn');
+    const message = document.getElementById('message');
+    const subtitle = document.getElementById('subtitle');
+    const debugLog = document.getElementById('debugLog');
+    const openAppBtn = document.getElementById('openAppBtn');
+
+    function log(text, type) {
+      console.log('[Reset]', text);
+      const line = document.createElement('div');
+      line.className = 'debug-line' + (type ? ' ' + type : '');
+      line.textContent = new Date().toLocaleTimeString() + ' ' + text;
+      debugLog.appendChild(line);
+      debugLog.classList.remove('hidden');
+    }
+
+    function showError(text) {
+      message.textContent = text;
+      message.className = 'error';
+      message.classList.remove('hidden');
+      log('ERROR: ' + text, 'error');
+    }
+
+    function showSuccess(text) {
+      message.textContent = text;
+      message.className = 'success';
+      message.classList.remove('hidden');
+      log('SUCCESS: ' + text, 'success');
+    }
+
+    function showInfo(text) {
+      message.textContent = text;
+      message.className = 'info';
+      message.classList.remove('hidden');
+      log('INFO: ' + text);
+    }
+
+    function openApp() {
+      // Try to open Android app via intent
+      window.location.href = 'intent://#Intent;scheme=capacitor;package=com.fennec.academy;end';
+      setTimeout(() => {
+        // Fallback if app not installed
+        subtitle.textContent = 'You can close this page and open the Fennec app manually.';
+      }, 500);
+    }
+
+    // Parse hash params
+    const pageHash = window.location.hash.substring(1);
+    const pageParams = new URLSearchParams(pageHash);
+    const accessToken = pageParams.get('access_token');
+    const refreshToken = pageParams.get('refresh_token');
+    const type = pageParams.get('type');
+
+    log('Page loaded. Hash type: ' + type);
+    log('Access token present: ' + !!accessToken);
+    log('Refresh token present: ' + !!refreshToken);
+
+    if (type !== 'recovery' || !accessToken) {
+      showError('Invalid or expired reset link. Please request a new one from the app.');
+      form.style.display = 'none';
+      subtitle.textContent = 'Link error';
+    }
+
+    async function handleReset(e) {
+      e.preventDefault();
+      
+      if (newPassword.value !== confirmPassword.value) {
+        showError('Passwords do not match');
+        return;
+      }
+
+      if (newPassword.value.length < 6) {
+        showError('Password must be at least 6 characters');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Updating...';
+
+      try {
+        log('Step 1: Setting session with recovery token...');
+        
+        // Set the session from the recovery token
+        const sessionData = {
+          access_token: accessToken,
+          refresh_token: refreshToken || ''
+        };
+        log('Session data: ' + JSON.stringify({ access_token: '***', refresh_token: refreshToken ? '***' : 'none' }));
+
+        const { data: sessionResult, error: sessionError } = await client.auth.setSession(sessionData);
+
+        if (sessionError) {
+          log('setSession error: ' + sessionError.message, 'error');
+          throw sessionError;
+        }
+        
+        log('Step 2: Session set. User: ' + (sessionResult?.user?.email || 'unknown'));
+
+        // Verify we have a valid session
+        const { data: { session } } = await client.auth.getSession();
+        if (!session) {
+          throw new Error('Session not established after setSession');
+        }
+        log('Step 3: Session verified. User ID: ' + session.user.id.substring(0, 8) + '...');
+
+        // Update the password
+        log('Step 4: Updating password...');
+        const { data: updateResult, error: updateError } = await client.auth.updateUser({
+          password: newPassword.value
+        });
+
+        if (updateError) {
+          log('updateUser error: ' + updateError.message, 'error');
+          throw updateError;
+        }
+
+        log('Step 5: Password updated for user: ' + updateResult?.user?.email);
+        
+        showSuccess('Password updated! You can now sign in with your new password.');
+        form.style.display = 'none';
+        openAppBtn.classList.remove('hidden');
+        subtitle.textContent = 'Success!';
+
+      } catch (err) {
+        log('CATCH: ' + (err.message || err), 'error');
+        showError(err.message || 'Something went wrong. Please try again or request a new link.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Update Password';
+      }
+    }
+
+    form.addEventListener('submit', handleReset);
+  </script>
+</body>
+</html>
