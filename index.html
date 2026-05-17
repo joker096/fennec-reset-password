@@ -125,15 +125,17 @@
       message.classList.remove('hidden');
     }
 
-    // Parse token from URL: ?token=xxx&type=recovery
+    // Parse params: ?token=xxx&type=recovery&email=user@example.com
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const type = params.get('type');
+    const email = params.get('email');
 
     log('Token present: ' + !!token);
     log('Type: ' + type);
+    log('Email present: ' + !!email);
 
-    if (!token || type !== 'recovery') {
+    if (!token || !email || type !== 'recovery') {
       showError('Invalid or expired reset link. Please request a new one from the Fennec app.');
       form.style.display = 'none';
       subtitle.textContent = 'Link error';
@@ -155,10 +157,11 @@
       submitBtn.textContent = 'Updating...';
 
       try {
-        log('Step 1: Verifying recovery token...');
+        log('Step 1: Verifying recovery token for ' + email);
         
-        // Verify OTP token — this establishes a session
+        // Verify OTP token with email — this establishes a session
         const { data: verifyData, error: verifyError } = await client.auth.verifyOtp({
+          email: email,
           token: token,
           type: 'recovery'
         });
